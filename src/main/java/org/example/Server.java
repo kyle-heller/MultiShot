@@ -16,21 +16,25 @@ public class Server {
 
             System.out.println("Waiting for client");
 
-            socket = server.accept();
-            System.out.println("Client accepted");
-
-            in = new DataInputStream(
-                    new BufferedInputStream(socket.getInputStream()));
-
             String line = "";
 
-            while(!line.equals("Stop")) {
+            while(!server.isClosed()) {
                 try {
-                    line = in.readUTF();
-                    System.out.println(line);
+
+                    socket = server.accept();
+                    System.out.println("Client accepted");
+
+                    ClientHandler clientHandler = new ClientHandler(socket);
+
+                    Thread thread = new Thread(clientHandler);
+                    thread.start();
+
+                    in = new DataInputStream(
+                            new BufferedInputStream(socket.getInputStream()));
+
                 }
                 catch(IOException i) {
-                    System.out.println(i);
+//                    System.out.println(i);
                 }
             }
             System.out.println("Closing connection");
@@ -42,6 +46,15 @@ public class Server {
         }
     }
 
+    public void closeServerSocket() {
+        try {
+            if (server != null) {
+                server.close();
+            }
+        } catch (IOException e) {
+            throw new RuntimeException(e);
+        }
+    }
     public static void main(String[] args) {
     }
 
