@@ -50,6 +50,6 @@ public class Client {
     }
 
     public static void main(String[] args) {
-        Client client = new Client("https://multishot.azurewebsites.net", 6666);
+        Client client = new Client("20.119.8.58", 443);
     }
 }
