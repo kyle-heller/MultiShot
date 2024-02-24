@@ -2,8 +2,7 @@ package org.example;
 
 public class MultiShot {
     public static void main(String[] args) {
-
-        System.out.println("Hello world!");
+        Server server = new Server(6666);
     }
 
 }
