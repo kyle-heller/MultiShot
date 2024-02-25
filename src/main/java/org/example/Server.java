@@ -1,6 +1,8 @@
 package org.example;
 
 import java.io.*;
+import java.util.List;
+import java.util.ArrayList;
 import java.net.*;
 import java.util.Hashtable;
 
@@ -10,8 +12,6 @@ public class Server {
     private Socket socket;
     private ServerSocket server;
     private DataInputStream in;
-
-    Hashtable<Integer, String> connectedUsers = new Hashtable<>();
 
     public Server(int port) {
         try {
@@ -59,6 +59,8 @@ public class Server {
             throw new RuntimeException(e);
         }
     }
+
+
     public static void main(String[] args) {
     }
 
