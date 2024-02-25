@@ -82,3 +82,4 @@ public class Client {
         client.sendMessage();
     }
 }
+//20.119.8.58 Azure endpoint
