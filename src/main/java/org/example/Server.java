@@ -2,12 +2,16 @@ package org.example;
 
 import java.io.*;
 import java.net.*;
+import java.util.Hashtable;
+
 public class Server {
 
 
     private Socket socket;
     private ServerSocket server;
     private DataInputStream in;
+
+    Hashtable<Integer, String> connectedUsers = new Hashtable<>();
 
     public Server(int port) {
         try {
