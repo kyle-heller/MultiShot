@@ -76,7 +76,7 @@ public class Client {
         Scanner scanner = new Scanner(System.in);
         System.out.println("Define your username: ");
         String username= scanner.nextLine();
-        Socket socket = new Socket("20.119.8.58",443);
+        Socket socket = new Socket("172.206.251.172",443);
         Client client = new Client(socket, username);
         client.listenForMessage();
         client.sendMessage();
