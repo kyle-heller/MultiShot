@@ -4,6 +4,10 @@ import java.net.Socket;
 import java.util.ArrayList;
 import java.util.List;
 
+import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.databind.ObjectMapper; // Jackson's JSON processor
+
+
 public class ClientHandler implements Runnable{
 
     public static ArrayList<ClientHandler> clientHandlers = new ArrayList<>();
@@ -11,6 +15,7 @@ public class ClientHandler implements Runnable{
     private BufferedReader bufferedReader;
     private BufferedWriter bufferedWriter;
     private String clientUsername;
+    private boolean isInitialized = false;
 
     public ClientHandler(Socket socket){
         try{
@@ -19,41 +24,45 @@ public class ClientHandler implements Runnable{
             this.bufferedReader=new BufferedReader(new InputStreamReader(socket.getInputStream()));
             this.clientUsername=bufferedReader.readLine();
             clientHandlers.add(this);
-            System.out.println(clientHandlers);
-            broadcastMSG("Server: "+clientUsername+" has entered the chat!");
-
         }catch(IOException e){
             closeAll(socket,bufferedReader,bufferedWriter);
 
         }
     }
 
+    public void finishInitialization() {
+        // Logic to send join notification
+        Message joinMessage = new Message("SYSTEM", "ALL", "Server: " + this.clientUsername + " has entered the chat!", true);
+        broadcastMSG(joinMessage);
+        this.isInitialized = true;
+    }
+
+    public boolean isInitialized() {
+        return isInitialized;
+    }
+
 
     @Override
     public void run() {
-        String messageFromClient;
-        while(socket.isConnected()){
+        ObjectMapper mapper = new ObjectMapper();
+
+        while (socket.isConnected()) {
             try {
-                messageFromClient = bufferedReader.readLine();
-                // Assuming the format is "username: command/message"
-                String[] parts = messageFromClient.split("[ :]+");
-                if (parts.length > 1) { // Make sure there is a command/message part
-                    String command = parts[1]; // This is the actual command or message
-                    if ("GET_ALL_USERS".equalsIgnoreCase(command)) {
-                        String allUsernames = String.join(", ", getAllUsernames());
-                        bufferedWriter.write("Connected users: " + allUsernames);
-                        bufferedWriter.newLine();
-                        bufferedWriter.flush();
-                    } else if ("PM".equalsIgnoreCase(command)) {
-                        String targetUser = parts[2];
-                        directMSG(messageFromClient, targetUser);
-                    } else {
-                        // Handle regular messages
-                        broadcastMSG(messageFromClient);
-                    }
-                } else {
-                    // Handle cases where the message does not follow the expected format
-                    broadcastMSG(messageFromClient);
+                String messageFromClient = bufferedReader.readLine();
+                Message message = mapper.readValue(messageFromClient, Message.class);
+
+                // Check if the message is a regular group message and not from the system
+                if (message.isGroupMessage() && !"SYSTEM".equals(message.getSenderId())) {
+                    broadcastMSG(message); // This is a regular group chat message; broadcast it directly.
+                }
+                else if ("SYSTEM".equals(message.getSenderId())) {
+                    // Handle system messages, like notifying clients of a user's connection/disconnection
+                    // Depending on your implementation, you might create and send a specific system message here
+                    broadcastSystemMessage(message); // Assuming you have a method to handle system-specific messages
+                }
+                else {
+                    // Assuming non-group messages are direct messages
+                    directMSG(message); // Handle direct messages
                 }
             } catch(IOException e) {
                 closeAll(socket, bufferedReader, bufferedWriter);
@@ -62,36 +71,86 @@ public class ClientHandler implements Runnable{
         }
     }
 
-    public void broadcastMSG(String messageToSend){
-        for(ClientHandler clientHandler: clientHandlers){
-            try{
-                if(!clientHandler.clientUsername.equals(clientUsername)){
-                    clientHandler.bufferedWriter.write(messageToSend);
+
+    public void broadcastMSG(Message message) {
+        ObjectMapper mapper = new ObjectMapper();
+        String jsonMessage;
+        try {
+            jsonMessage = mapper.writeValueAsString(message);
+        } catch (JsonProcessingException e) {
+            e.printStackTrace();
+            return; // Exit the method if JSON serialization fails
+        }
+
+        for (ClientHandler clientHandler : clientHandlers) {
+            try {
+                // Exclude the sender from receiving the message
+                // This works for both user messages and system messages where the sender is SYSTEM
+                if (!clientHandler.getClientUsername().equals(message.getSenderId())) {
+                    clientHandler.bufferedWriter.write(jsonMessage);
                     clientHandler.bufferedWriter.newLine();
                     clientHandler.bufferedWriter.flush();
                 }
-            }catch(IOException e){
-                closeAll(socket, bufferedReader,bufferedWriter);
+            } catch (IOException e) {
+                closeAll(clientHandler.socket, clientHandler.bufferedReader, clientHandler.bufferedWriter);
             }
         }
     }
 
-    public void directMSG(String messageToSend, String username){
-        for(ClientHandler clientHandler: clientHandlers){
-            try{
-                if(clientHandler.clientUsername.equals(username)){
-                    clientHandler.bufferedWriter.write(messageToSend);
+    public void broadcastSystemMessage(Message systemMessage) {
+        // Convert the Message object to JSON
+        ObjectMapper mapper = new ObjectMapper();
+        String jsonMessage;
+        try {
+            jsonMessage = mapper.writeValueAsString(systemMessage);
+        } catch (JsonProcessingException e) {
+            e.printStackTrace();
+            return; // Exit the method if JSON serialization fails
+        }
+
+        // Iterate over all connected client handlers and send the message
+        for (ClientHandler clientHandler : clientHandlers) {
+            try {
+                // Check if the client's BufferedWriter is not null
+                if (clientHandler.bufferedWriter != null) {
+                    clientHandler.bufferedWriter.write(jsonMessage);
                     clientHandler.bufferedWriter.newLine();
                     clientHandler.bufferedWriter.flush();
                 }
-            }catch(IOException e){
-                closeAll(socket, bufferedReader,bufferedWriter);
+            } catch (IOException e) {
+                // Attempt to close resources if sending the message fails
+                closeAll(clientHandler.socket, clientHandler.bufferedReader, clientHandler.bufferedWriter);
             }
         }
     }
+
+
+    public void directMSG(Message message) {
+        for (ClientHandler clientHandler : clientHandlers) {
+            try {
+                if (clientHandler.getClientUsername().equals(message.getRecipientId())) { // Match the recipient
+                    ObjectMapper mapper = new ObjectMapper();
+                    String jsonMessage = mapper.writeValueAsString(message); // Convert the Message object to JSON
+
+                    clientHandler.bufferedWriter.write(jsonMessage);
+                    clientHandler.bufferedWriter.newLine();
+                    clientHandler.bufferedWriter.flush();
+                    break; // Stop once the intended recipient is found and messaged
+                }
+            } catch (IOException e) {
+                closeAll(clientHandler.socket, clientHandler.bufferedReader, clientHandler.bufferedWriter);
+            }
+        }
+    }
+
+    public Message createSystemMessage(String content) {
+
+        return new Message("SYSTEM", "ALL", content, true);
+    }
+
     public void removeCliHandler(){
         clientHandlers.remove(this);
-        broadcastMSG("Server: "+clientUsername+" left the room.");
+        broadcastMSG(createSystemMessage(clientUsername + " left the room."));
     }
 
     public void closeAll(Socket socket, BufferedReader bufferedReader, BufferedWriter bufferedWriter){
@@ -116,7 +175,6 @@ public class ClientHandler implements Runnable{
         for (ClientHandler clientHandler : ClientHandler.clientHandlers) {
             usernames.add(clientHandler.getClientUsername());
         }
-        System.out.println(usernames);
         return usernames;
     }
 

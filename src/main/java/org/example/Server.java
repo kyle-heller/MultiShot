@@ -18,7 +18,7 @@ public class Server {
             server = new ServerSocket(port);
             System.out.println("Server started");
 
-            System.out.println("Waiting for clients");
+            System.out.println("Waiting for clients...");
 
             String line = "";
 
@@ -33,12 +33,14 @@ public class Server {
                     Thread thread = new Thread(clientHandler);
                     thread.start();
 
+                    clientHandler.finishInitialization();
+
                     in = new DataInputStream(
                             new BufferedInputStream(socket.getInputStream()));
 
                 }
                 catch(IOException i) {
-//                    System.out.println(i);
+                    System.out.println(i);
                 }
             }
             System.out.println("Closing connection");

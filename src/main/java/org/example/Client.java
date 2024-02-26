@@ -1,4 +1,7 @@
 package org.example;
+
+import com.fasterxml.jackson.databind.ObjectMapper; // Jackson's JSON processor
+
 import java.io.*;
 import java.net.Socket;
 import java.util.Scanner;
@@ -10,35 +13,53 @@ public class Client {
     private BufferedWriter bufferedWriter;
     private String username;
 
-    public Client(Socket socket,String username){
-        try{
-            this.socket=socket;
-            this.bufferedWriter=new BufferedWriter(new OutputStreamWriter(socket.getOutputStream()));
-            this.bufferedReader=new BufferedReader(new InputStreamReader(socket.getInputStream()));
-            this.username=username;
-        }catch(IOException e){
-            closeAll(socket,bufferedReader,bufferedWriter);
-        }
-    }
+    public Client(Socket socket, String username) {
+        try {
+            this.socket = socket;
+            this.bufferedWriter = new BufferedWriter(new OutputStreamWriter(socket.getOutputStream()));
+            this.bufferedReader = new BufferedReader(new InputStreamReader(socket.getInputStream()));
+            this.username = username;
 
-    public void sendMessage(){
-        try{
+            // Immediately send the username to the server
             bufferedWriter.write(username);
             bufferedWriter.newLine();
             bufferedWriter.flush();
-
-            Scanner scanner =new Scanner(System.in);
-            while(socket.isConnected()){
-                String messageToSend= scanner.nextLine();
-                bufferedWriter.write(username+": "+messageToSend);
-                bufferedWriter.newLine();
-                bufferedWriter.flush();
-
-            }
-        }catch (IOException e){
-            closeAll(socket,bufferedReader,bufferedWriter);
+        } catch(IOException e) {
+            closeAll(socket, bufferedReader, bufferedWriter);
         }
     }
+
+    public void sendMessage() {
+        try {
+            ObjectMapper mapper = new ObjectMapper(); // Create an ObjectMapper instance for JSON serialization
+            Scanner scanner = new Scanner(System.in); // Scanner for reading user input
+
+            System.out.println("Enter the recipient's username (type 'everyone' for group messages):");
+            String recipient = scanner.nextLine(); // Read the recipient's username
+
+            while (socket.isConnected()) {
+                String text = scanner.nextLine(); // Read the message text
+
+                // Construct a Message object
+                Message message = new Message();
+                message.setSenderId(this.username); // Set the sender ID to this client's username
+                message.setRecipientId(recipient.equals("everyone") ? "ALL" : recipient); // Set recipient; use "ALL" for group messages
+                message.setMessage(text); // Set the actual message text
+                message.setGroupMessage(recipient.equals("everyone")); // Determine if it's a group message based on the recipient input
+
+                String jsonMessage = mapper.writeValueAsString(message); // Serialize the Message object to JSON
+
+                System.out.println("Sending Message: " + jsonMessage);
+
+                bufferedWriter.write(jsonMessage); // Write the JSON string to the buffered writer
+                bufferedWriter.newLine(); // Write a newline to indicate the end of the message
+                bufferedWriter.flush(); // Flush the stream to ensure the message is sent
+            }
+        } catch (IOException e) {
+            closeAll(socket, bufferedReader, bufferedWriter); // Close all connections on exception
+        }
+    }
+
     public void listenForMessage(){
         new Thread(new Runnable() {
             @Override
