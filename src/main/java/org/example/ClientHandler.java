@@ -36,7 +36,7 @@ public class ClientHandler implements Runnable{
             try {
                 messageFromClient = bufferedReader.readLine();
                 // Assuming the format is "username: command/message"
-                String[] parts = messageFromClient.split(": ", 2); // Split into at most 2 parts, username and the rest
+                String[] parts = messageFromClient.split("[ :]+");
                 if (parts.length > 1) { // Make sure there is a command/message part
                     String command = parts[1]; // This is the actual command or message
                     if ("GET_ALL_USERS".equalsIgnoreCase(command)) {
@@ -44,6 +44,9 @@ public class ClientHandler implements Runnable{
                         bufferedWriter.write("Connected users: " + allUsernames);
                         bufferedWriter.newLine();
                         bufferedWriter.flush();
+                    } else if ("PM".equalsIgnoreCase(command)) {
+                        String targetUser = parts[2];
+                        directMSG(messageFromClient, targetUser);
                     } else {
                         // Handle regular messages
                         broadcastMSG(messageFromClient);
@@ -63,6 +66,20 @@ public class ClientHandler implements Runnable{
         for(ClientHandler clientHandler: clientHandlers){
             try{
                 if(!clientHandler.clientUsername.equals(clientUsername)){
+                    clientHandler.bufferedWriter.write(messageToSend);
+                    clientHandler.bufferedWriter.newLine();
+                    clientHandler.bufferedWriter.flush();
+                }
+            }catch(IOException e){
+                closeAll(socket, bufferedReader,bufferedWriter);
+            }
+        }
+    }
+
+    public void directMSG(String messageToSend, String username){
+        for(ClientHandler clientHandler: clientHandlers){
+            try{
+                if(clientHandler.clientUsername.equals(username)){
                     clientHandler.bufferedWriter.write(messageToSend);
                     clientHandler.bufferedWriter.newLine();
                     clientHandler.bufferedWriter.flush();

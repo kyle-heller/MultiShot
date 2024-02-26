@@ -18,7 +18,7 @@ public class Server {
             server = new ServerSocket(port);
             System.out.println("Server started");
 
-            System.out.println("Waiting for client");
+            System.out.println("Waiting for clients");
 
             String line = "";
 
